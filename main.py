@@ -1,6 +1,8 @@
 from enum import Enum
+from typing import Annotated
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
+from pydantic import AfterValidator, BaseModel
 
 
 app = FastAPI()
@@ -134,3 +136,52 @@ async def read_bumbum_tone_of_queries(bumbum_id: int, rank_id: str, rank_divisio
     if description:
         response["description"] = description
     return response
+
+
+### Request Body
+
+class Item(BaseModel):
+    name: str
+    description: str | None = None
+    price: float
+    tax: float | None = None
+
+@app.post("/items/{item_id}")
+async def create_item(item_id: int, item: Item, q: str | None = None):
+    item_dict = item.dict()
+    item_dict.update({"item_id": item_id})
+    if item.tax is not None:
+        price_with_tax = item.price + item.tax
+        item_dict.update({"price_with_tax": price_with_tax})
+    if q:
+        item_dict.update({"q": q})
+    return item_dict
+
+### Query Param Validation
+
+@app.get("/specific-query")
+async def specific_query(q: Annotated[str | None, Query(min_length=3, max_length=50, pattern="^fixedquery$")] = None):
+    return {"Query": q}
+
+@app.get("/query-list")
+async def query_list(q: Annotated[list[str] | None, Query()] = None):
+    return q
+
+data = {
+    "isbn-9781529046137": "The Hitchhiker's Guide to the Galaxy",
+    "imdb-tt0371724": "The Hitchhiker's Guide to the Galaxy",
+    "isbn-9781439512982": "Isaac Asimov: The Complete Stories, Vol. 2",
+}
+
+def check_valid_id(id: str):
+    if not id.startswith(("isbn-", "imdb-")):
+        raise ValueError('Invalid ID format, it must start with "isbn-" or "imdb-"')
+    return id
+
+@app.get("/custom-query-validation")
+async def custom_query_validation(id: Annotated[str | None, AfterValidator(check_valid_id)] = None):
+    if id:
+        item = data.get(id)
+    else:
+        id, item = random.choice(list(data.items()))
+    return {"id": id, "name": item}
