@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Annotated
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Path, Query
 from pydantic import AfterValidator, BaseModel
 
 
@@ -185,3 +185,29 @@ async def custom_query_validation(id: Annotated[str | None, AfterValidator(check
     else:
         id, item = random.choice(list(data.items()))
     return {"id": id, "name": item}
+
+### Path Param Validation
+
+@app.get("/paths/{path_id}")
+async def path_validation(
+    path_id: Annotated[int, Path(title="The ID of the item to get")]
+):
+    return {"path_id": path_id}
+
+### Python magic
+
+@app.get("/python-magic/{id}")
+async def python_magic(*, id: int = Path(title="BumBum who reads it"), q: str):
+    """
+    Python won't do anything with that *, but it will know that all the following parameters should be called as keyword arguments (key-value pairs), also known as kwargs. Even if they don't have a default value.
+    """
+    return {
+        "id": id,
+        "q": q
+    }
+
+### Numeric validations
+
+@app.get("/path-num-validation/{item_id}")
+async def path_num_validation(item_id: Annotated[int, Path(title="dfhufhjfhur", gt=1, le=100)]):
+    return {"item_id": item_id}
